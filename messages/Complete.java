@@ -1,4 +1,4 @@
-package com.rover.spike;
+package messages;
 
 import java.io.Serializable;
 

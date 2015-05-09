@@ -1,6 +1,5 @@
-package com.rover.spike;
+package messages;
 
-import java.awt.Point;
 import java.io.Serializable;
 
 public class Task implements Serializable{
@@ -11,7 +10,8 @@ public class Task implements Serializable{
 	public enum AgentTypes{
 		POLICE,AMBULANCE
 	}
-	public Point wayPoint;
+	public double wayPoint_x;
+	public double wayPoint_y;
 	public long activationTime;
 	public int taskId;
 	public AgentTypes agentType;
