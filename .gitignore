@@ -1,3 +1,4 @@
 *.project
 TomGit/bin/*
+*.jar
 cv/*

@@ -1,6 +1,14 @@
 package com.example.tom;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+
+import messages.Method;
+import messages.Task;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
@@ -9,6 +17,7 @@ import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.MqttSecurityException;
 
 import android.app.Activity;
@@ -57,7 +66,33 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		final Button button = (Button) findViewById(R.id.calOffset);
         button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+            	Log.d("Tom", "Button!");
                 bearingOffset = mBearing;
+                if (!client.isConnected()) return;
+                Method m1 = new Method("OOH", Method.AgentTypes.POLICE, 10, 10, System.nanoTime());
+                Task t1 = new Task("Bang");
+                t1.addMethod(m1);
+        		ByteArrayOutputStream b = new ByteArrayOutputStream();
+				try {
+					ObjectOutputStream o = new ObjectOutputStream(b);
+					o.writeObject(task);
+	        		o.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+        		
+        		byte bytes[]=b.toByteArray();
+                try {
+					client.publish("tasklist", bytes, 2, false);
+					Log.d("Tom", "Published!");
+				} catch (MqttPersistenceException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (MqttException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
             }
         });
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -115,20 +150,30 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		// TODO Auto-generated method stub
 		
 	}
-
+	
 	@Override
-	public void messageArrived(String arg0, MqttMessage mesg) throws Exception {
-		Log.d("Tom", "Got message: " + mesg.toString());
-		String msg[] = mesg.toString().split("\\s+");
-		if (msg[0].contentEquals("GPS")) {
-			loc_x = Double.parseDouble(msg[1]);
-			loc_y = Double.parseDouble(msg[2]);
-		} else if (msg[0].contentEquals("Waypoint")) {
-			target_x = Double.parseDouble(msg[1]);
-			target_y = Double.parseDouble(msg[2]);
-		} else {
-			Log.d("Tom", "Unknown mqtt message");
-		}
+	public void messageArrived(String arg0, MqttMessage mesg) throws Exception {	
+		ByteArrayInputStream b1 = new ByteArrayInputStream(mesg.getPayload());
+        ObjectInputStream o1 = new ObjectInputStream(b1);
+        Object unknownMsg = o1.readObject();
+        
+        if (unknownMsg == ArrayList.class) {
+        	ArrayList<Task> tasks = (ArrayList<Task>) unknownMsg;
+        	Log.d("Tom", "Got tasks: ");
+        	for(Task t : tasks) {
+        		Log.d("Tom", "T" + t.taskId + ": " + t.wayPointX + " " + 
+        				t.wayPointY + " " + t.agentType);
+        	}
+        } else {
+			Log.d("Tom", "Got message: " + mesg.toString());
+			String msg[] = mesg.toString().split("\\s+");
+			if (msg[0].contentEquals("GPS")) {
+				loc_x = Double.parseDouble(msg[1]);
+				loc_y = Double.parseDouble(msg[2]);
+			}  else {
+				Log.d("Tom", "Unknown mqtt message");
+			}
+        }
 	}
 
 	@Override
@@ -147,7 +192,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		Log.d("Tom", "Success!");
 		try {
 			client.subscribe("gps/" + id, 0); // This gets called ~5 times a second
-			client.subscribe("waypoint/" + id, 2); // Only gets sent when the waypoint is updated
+			client.subscribe("tasklist", 2);
 		} catch (MqttSecurityException e) {
 			e.printStackTrace();
 		} catch (MqttException e) {
