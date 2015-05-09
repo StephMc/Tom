@@ -7,7 +7,9 @@
 #include <signal.h>
 #include <fstream>
 #include <iostream>
-#include <time.h>
+#include <sys/time.h>
+
+#define NUM_ROVER 2
 
 static volatile int keepRunning = 1;
 
@@ -20,23 +22,32 @@ vector<Point2f> lastGood;
 vector<Point2f> curTargets;
 
 fstream slog, r0log, r1log;
-vector<Point2f> waypointsToVisit;
-vector<Point2f> waypointsVisited;
+vector<Point2f> waypointsToVisit[NUM_ROVER];
+vector<Point2f> waypointsVisited[NUM_ROVER];
 struct mosquitto *mozzie;
 
-time_t start_time;
+struct timeval start_time;
 
 void intHandler(int dummy) {
     keepRunning = 0;
 }
 
+double get_time() {
+    struct timeval now, diff;
+    if (gettimeofday(&now, NULL)) perror("Time of day");
+    timersub(&now, &start_time, &diff);
+    return diff.tv_sec + (double) diff.tv_usec / 1000000;
+}
+
 void publish_waypoint(int robot) {
+    if (robot >= curTargets.size()) perror("ahghg");
     char msg[100], topic[100];
     sprintf(topic, "waypoint/%d", robot);
     sprintf(msg, "Waypoint %f %f\n", curTargets[robot].x, curTargets[robot].y);
     cout << "Sending::: " << msg << endl;
-    int err = mosquitto_publish(mozzie, NULL, topic, strlen(msg), msg, 2, false);
+    int err = mosquitto_publish(mozzie, NULL, topic, strlen(msg), msg, 0, false);
     if (err != MOSQ_ERR_SUCCESS) perror("mozzie pubish fail");
+    slog << (double) get_time() << ": Robot " << robot << " to " << curTargets[robot].x << " " << curTargets[robot].y << endl;
 }
 
 
@@ -45,11 +56,12 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     if  ( event == EVENT_LBUTTONDOWN )
     {
         cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-        waypointsToVisit.push_back(Point2f(x, y));
+        waypointsToVisit[0].push_back(Point2f(x, y));
     }
     else if  ( event == EVENT_RBUTTONDOWN )
     {
         cout << "Right button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+        waypointsToVisit[1].push_back(Point2f(x, y));
     }
     else if  ( event == EVENT_MBUTTONDOWN )
     {
@@ -124,16 +136,16 @@ void process (Mat& frame, vector<Mat> des, vector<Mat> imgs,
             if (dist < 25) {
                 trajectories[i].push_back(center);
 
-                if (!waypointsToVisit.empty()) {
+                if (!waypointsToVisit[i].empty()) {
                     // Get the current waypoint for this object
                     
                     double distTarget = norm(Mat(center), Mat(curTargets[i]));
                     cout << "Dist from " << curTargets[i] << " is " << distTarget << endl;
                     if (distTarget < 40) {
                         // We reached the waypoint, get a new target
-                        waypointsVisited.push_back(curTargets[i]);
-                        curTargets[i] = waypointsToVisit.back();
-                        waypointsToVisit.pop_back();
+                        waypointsVisited[i].push_back(curTargets[i]);
+                        curTargets[i] = waypointsToVisit[i].back();
+                        waypointsToVisit[i].pop_back();
                         publish_waypoint(i);
                     }
                     circle(f, curTargets[i], 15, c, -1, 15);
@@ -146,17 +158,17 @@ void process (Mat& frame, vector<Mat> des, vector<Mat> imgs,
         //}
         //    imshow("Go", f);
         //waitKey(0);
-
+        // Print way points to visit
+        Scalar toVisit(255, 255, 255);
+        for (int j = 0; j < waypointsToVisit[i].size(); j++) {
+            circle(f, waypointsToVisit[i][j], 5, c, -1, 8);
+        }
+        Scalar haveVisit(0, 0, 0);
+        for (int j = 0; j < waypointsVisited[i].size(); j++) {
+            circle(f, waypointsVisited[i][j], 5, haveVisit, -1, 8);
+        }
     }
-    // Print way points to visit
-    Scalar toVisit(255, 255, 255);
-    for (int j = 0; j < waypointsToVisit.size(); j++) {
-        circle(f, waypointsToVisit[j], 5, toVisit, -1, 8);
-    }
-    Scalar haveVisit(0, 0, 0);
-    for (int j = 0; j < waypointsVisited.size(); j++) {
-        circle(f, waypointsVisited[j], 5, haveVisit, -1, 8);
-    }
+    
 }
 
 void my_message_callback(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
@@ -184,7 +196,10 @@ int main(int argc, char** argv) {
     r0log.open(rover0_log_name, fstream::out);
     r1log.open(rover1_log_name, fstream::out);
    
-    start_time = time(NULL);
+    if (gettimeofday(&start_time, NULL)) {
+        cout << "Get time of day failed" << endl;
+        return 0;
+    }
 
     // Turn off auto focus
     system("v4l2-ctl -c focus_auto=0");
@@ -193,20 +208,26 @@ int main(int argc, char** argv) {
         cout << "Could not open video reference 0" << endl;
         return -1;
     }
+    
+    char video_name[50];
+    sprintf(video_name, "%s.mpeg", argv[2]);
+    VideoWriter vw;
+    //vw.open(video_name, CV_FOURCC('P','I','M','1'), 25, Size(480, 600), true);
     signal(SIGINT, intHandler);
 
-    /*   Mat q;
-       vc >> q;
-       vc >> q;
-       vc >> q;
-       vc >> q;
-       vc >> q;
-       vc >> q;
-       vc >> q;
-       vc >> q;
-       vc >> q;
-       imshow("im", q);
-       waitKey(0);*/
+    namedWindow("Out", 1);
+    Mat q;
+    vc >> q;
+    //   vc >> q;
+    //   vc >> q;
+    //   vc >> q;
+    //   vc >> q;
+    //   vc >> q;
+    //   vc >> q;
+    //   vc >> q;
+    //   vc >> q;
+    imshow("Out", q);
+    waitKey(0);
 
     // Setup the mosquitto library
     mosquitto_lib_init();
@@ -257,24 +278,22 @@ int main(int argc, char** argv) {
 
     // Read in the way points to travel to
     fstream wps;
-    wps.open("waypoints.txt", fstream::in);
-    int x, y;
-    while (wps >> x >> y) waypointsToVisit.push_back(Point2f(x, y)); 
+    wps.open(argv[1], fstream::in);
+    int id, x, y;
+    while (wps >> id >> x >> y) waypointsToVisit[id].push_back(Point2f(x, y)); 
     char *msg = (char*) malloc(200);
     for (int i = 0; i < num_track; ++i) {
-        if (waypointsToVisit.empty()) break;
-        curTargets.push_back(waypointsToVisit.back());
-        waypointsToVisit.pop_back();
+        if (waypointsToVisit[i].empty()) break;
+        curTargets.push_back(waypointsToVisit[i].back());
+        waypointsToVisit[i].pop_back();
     }
     for (int i = 0; i < num_track; ++i) {
         publish_waypoint(i);
-        slog << difftime(time(NULL), start_time) << ": Robot " << i << " to " << curTargets[i].x << " " << curTargets[i].y << endl;
     }
 
     // Track objects until a sig_int is received
     //VideoWriter vw;
     int f = 0;
-    namedWindow("Out", 1);
     setMouseCallback("Out", CallBackFunc, NULL);
     char topic[100];
     while (keepRunning) {
@@ -291,10 +310,11 @@ int main(int argc, char** argv) {
                 sprintf(topic, "gps/%d", i);
                 sprintf(msg, "GPS %f %f\n", lastSeen[i].x, lastSeen[i].y);
                 cout << "Sending::: " << msg << endl;
-                if (i == 0) r0log << time(NULL) - start_time << ": At location " << lastSeen[0].x << " " << lastSeen[0].y << endl;
-                if (i == 1) r1log << time(NULL) - start_time << ": At location " << lastSeen[1].x << " " << lastSeen[1].y << endl;
+                if (i == 0) r0log << get_time() << ": At location " << lastSeen[0].x << " " << lastSeen[0].y << endl;
+                if (i == 1) r1log << get_time() << ": At location " << lastSeen[1].x << " " << lastSeen[1].y << endl;
                 int err = mosquitto_publish(mozzie, NULL, topic, strlen(msg), msg, 0, false);
                 if (err != MOSQ_ERR_SUCCESS) break;
+                //publish_waypoint(i);
             }
             imshow("Out", frame);
         }

@@ -64,8 +64,8 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		
 		// Connect to the mqtt server
 		int port = 1883;
-		String uri = "tcp://" + "192.168.1.3" + ":" + port;
-		client = new MqttAndroidClient(this, uri, "bob");
+		String uri = "tcp://" + "192.168.1.136" + ":" + port;
+		client = new MqttAndroidClient(this, uri, "bob"+id);
 		try {
 			client.connect(null, this);
 			client.setCallback(this);
@@ -217,6 +217,8 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		 *
 		 * @see ioio.lib.util.IOIOLooper#loop()
 		 */
+		float driveLP = 0;
+		float angLP = 0;
 		@Override
 		public void loop() throws ConnectionLostException, InterruptedException {
 			float driveVel = 0.0f;
@@ -228,14 +230,19 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 				double y_diff = loc_y - target_y;
 				double dist = Math.sqrt(Math.pow(x_diff, 2) + Math.pow(y_diff, 2));
 				double targetBearing = Math.atan2(y_diff, x_diff);
-				double curBearing = mBearing - bearingOffset;
+				double curBearing = capPI(mBearing - bearingOffset);
 				
-				if (dist > 20) driveVel = 0.25f;
+				if (dist > 20) driveVel = 0.4f;
+				float vltc = 0.1f;
+				float antc = 1.0f;
+				driveLP = driveLP * (1-vltc)+ driveVel * vltc;
 				double bdiff = bearingDiff(curBearing, targetBearing);
 				driveAng = (float) (bdiff * 3);
-				if (driveAng > 2) driveAng = 2.0f;
-				if (driveAng < -2) driveAng = -2.0f;
-				
+				if (driveAng > 2) driveAng = 1.0f;
+				if (driveAng < -2) driveAng = -1.0f;
+				angLP = angLP * (1-antc) + driveAng * antc;
+				driveVel = driveLP;
+				driveAng = angLP;
 				// Stopping the debug log from spamming the screen
 				p++;
 				if (p %10 == 0) {
