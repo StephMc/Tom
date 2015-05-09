@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.Map.Entry;
 
 import messages.Method;
 import messages.Task;
@@ -69,9 +70,9 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
             	Log.d("Tom", "Button!");
                 bearingOffset = mBearing;
                 if (!client.isConnected()) return;
-                Method m1 = new Method("OOH", Method.AgentTypes.POLICE, 10, 10, System.nanoTime());
-                Task t1 = new Task("Bang");
-                t1.addMethod(m1);
+                Method m1 = new Method("OOH", 10, 10, System.nanoTime());
+                Task task = new Task("Bang", Task.AgentTypes.POLICE);
+                task.addMethod(m1);
         		ByteArrayOutputStream b = new ByteArrayOutputStream();
 				try {
 					ObjectOutputStream o = new ObjectOutputStream(b);
@@ -157,12 +158,13 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         ObjectInputStream o1 = new ObjectInputStream(b1);
         Object unknownMsg = o1.readObject();
         
-        if (unknownMsg == ArrayList.class) {
-        	ArrayList<Task> tasks = (ArrayList<Task>) unknownMsg;
-        	Log.d("Tom", "Got tasks: ");
-        	for(Task t : tasks) {
-        		Log.d("Tom", "T" + t.taskId + ": " + t.wayPointX + " " + 
-        				t.wayPointY + " " + t.agentType);
+        if (unknownMsg == Task.class) {
+        	Task task = (Task) unknownMsg;
+        	Log.d("Tom", "Got methodss: ");
+        	for(Entry<String, Method> entry : task.methods.entrySet()) {
+        		Method m = entry.getValue();
+        		Log.d("Tom", "M" + m.methodId + ": " + m.wayPointX + " " + 
+        				m.wayPointY + " " + task.agentType);
         	}
         } else {
 			Log.d("Tom", "Got message: " + mesg.toString());
