@@ -31,7 +31,13 @@ public class Method extends Node implements Serializable {
 		this.activationTime = activationTime;
 		this.outcome = new Outcome(500, 10, 0);
 	}
-
+	public Method(String methodId, double wayPointX, double wayPointY, long activationTime,double quality, double duration) {
+		super(methodId);
+		this.x = wayPointX;
+		this.y = wayPointY;
+		this.activationTime = activationTime;
+		this.outcome = new Outcome(quality, duration, 0);
+	}
 	public Method(Method method) {
 		this(method.label, method.x, method.y, method.activationTime);
 	}
