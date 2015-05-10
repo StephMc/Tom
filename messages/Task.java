@@ -1,9 +1,10 @@
 package messages;
 
 import java.io.Serializable;
-import java.util.HashMap;
 
-public class Task implements Serializable {
+import scheduler.Node;
+
+public class Task extends Node implements Serializable {
 	/**
 	 * 
 	 */
@@ -11,23 +12,19 @@ public class Task implements Serializable {
 	static public enum AgentTypes{
 		POLICE,AMBULANCE
 	}
-	public String taskId;
-	public HashMap<String, Task> tasks;
-	public HashMap<String, Method> methods;
 	public AgentTypes agentType;
 	
 	public Task(String taskId, AgentTypes agentType) {
-		this.taskId = taskId;
-		this.agentType = agentType;
-		tasks = new HashMap<String, Task>();
-		methods = new HashMap<String, Method>();
+		super(taskId);
+		this.agentType = agentType;	
 	}
 	
-	public void addTask(Task t) {
-		tasks.put(t.taskId, t);
+	public void addNode(Node n) {
+		children.add(n);
 	}
-	
-	public void addMethod(Method m) {
-		methods.put(m.methodId, m);
+
+	@Override
+	public boolean IsTask() {
+		return true;
 	}
 }

@@ -2,8 +2,6 @@ package ioio.lib.api;
 
 import java.io.IOException;
 
-import ioio.lib.api.exception.ConnectionLostException;
-
 /**
  * Created by johnlam on 5/01/15.
  */

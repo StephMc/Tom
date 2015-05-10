@@ -5,11 +5,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.ArrayList;
-import java.util.Map.Entry;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import messages.Method;
 import messages.Task;
+import messages.TaskAssign;
+import messages.Utility;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
@@ -21,13 +25,19 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.MqttSecurityException;
 
-import android.app.Activity;
+import scheduler.Node;
+import scheduler.Schedule;
+import scheduler.ScheduleElement;
+import scheduler.Scheduler;
 import android.content.Context;
+import android.graphics.PointF;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -35,7 +45,6 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
-import ioio.lib.api.AnalogInput;
 import ioio.lib.api.DigitalOutput;
 import ioio.lib.api.IOIO;
 import ioio.lib.api.IOIO.VersionType;
@@ -49,14 +58,20 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 	private MqttAndroidClient client;
 	private double loc_x, loc_y, target_x, target_y;
 	private SensorManager mSensorManager;
-    private Sensor mMag;
-    private Sensor mAcc;
     private Sensor mRot;
     float[] mGravity;
     float[] mGeomagnetic;
     private float mBearing;
     private float bearingOffset;
-    private String id = "0";
+    private String agentId = "1";
+    private Queue<Schedule> jobQueue = new ConcurrentLinkedQueue<Schedule>();
+    private Schedule curSched = null;
+    
+    // Used to pass the task between ui thread and thread to calculate the cost of task
+    // This is needed since the task cost calculation is very slow and stop the robot getting
+    // position updates via mqtt.
+    Handler mHandler;
+    private Task assignTask;
     
     int p = 0;
     
@@ -70,38 +85,29 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
             	Log.d("Tom", "Button!");
                 bearingOffset = mBearing;
                 if (!client.isConnected()) return;
-                Method m1 = new Method("OOH", 10, 10, System.nanoTime());
+                Method m1 = new Method("meep", 110, 110, System.nanoTime());
+                Method m2 = new Method("OOH", 10, 10, System.nanoTime());
+                Method m3 = new Method("beep", 120, 120, System.nanoTime());
+                Method m4 = new Method("AAH", 100, 100, System.nanoTime());
+                Method m5 = new Method("small", 20, 20, System.nanoTime());
+                Method m6 = new Method("low", 30, 30, System.nanoTime());
                 Task task = new Task("Bang", Task.AgentTypes.POLICE);
-                task.addMethod(m1);
-        		ByteArrayOutputStream b = new ByteArrayOutputStream();
-				try {
-					ObjectOutputStream o = new ObjectOutputStream(b);
-					o.writeObject(task);
-	        		o.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-        		
-        		byte bytes[]=b.toByteArray();
-                try {
-					client.publish("tasklist", bytes, 2, false);
-					Log.d("Tom", "Published!");
-				} catch (MqttPersistenceException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (MqttException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+                task.addNode(m1);
+                task.addNode(m2);
+                task.addNode(m3);
+                //task.addNode(m4);
+                //task.addNode(m5);
+                //task.addNode(m6);
+                publishObject("tasklist", task);
+                Log.d("Tom", "Sent task " + task.label + " with " + task.children.size());
             }
         });
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 		
 		// Connect to the mqtt server
 		int port = 1883;
-		String uri = "tcp://" + "192.168.1.136" + ":" + port;
-		client = new MqttAndroidClient(this, uri, "bob"+id);
+		String uri = "tcp://" + "192.168.0.100" + ":" + port;
+		client = new MqttAndroidClient(this, uri, "bob" + agentId);
 		try {
 			client.connect(null, this);
 			client.setCallback(this);
@@ -119,6 +125,40 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		mSensorManager = (SensorManager) this.getSystemService(Context.SENSOR_SERVICE);
 		mRot = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 		mSensorManager.registerListener(this, mRot, SensorManager.SENSOR_DELAY_NORMAL);
+		
+		// Set up the handler for inter thread comms
+		mHandler = new Handler(this.getMainLooper()) {
+			@Override
+            public void handleMessage(Message inputMessage) {
+				Log.d("Tom", "Handled!");
+				Utility u = (Utility) inputMessage.obj;
+				publishObject("utility", u);
+			}
+		};
+	}
+	
+	public void publishObject(String topic, Object message) {
+		ByteArrayOutputStream b = new ByteArrayOutputStream();
+		try {
+			ObjectOutputStream o = new ObjectOutputStream(b);
+			o.writeObject(message);
+    		o.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		byte bytes[]=b.toByteArray();
+        try {
+			client.publish(topic, bytes, 2, false);
+			Log.d("Tom", "Published!");
+		} catch (MqttPersistenceException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (MqttException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	@Override
@@ -157,16 +197,42 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		ByteArrayInputStream b1 = new ByteArrayInputStream(mesg.getPayload());
         ObjectInputStream o1 = new ObjectInputStream(b1);
         Object unknownMsg = o1.readObject();
-        
-        if (unknownMsg == Task.class) {
+        if (unknownMsg.getClass() == Task.class) {
         	Task task = (Task) unknownMsg;
-        	Log.d("Tom", "Got methodss: ");
-        	for(Entry<String, Method> entry : task.methods.entrySet()) {
-        		Method m = entry.getValue();
-        		Log.d("Tom", "M" + m.methodId + ": " + m.wayPointX + " " + 
-        				m.wayPointY + " " + task.agentType);
+        	Log.d("Tom", "Got task " + task.label + " with " + task.children.size());
+        	PointF p = new PointF();
+        	if (loc_x == -1) {
+        		Log.d("Tom", "Got no location, using loc 0, 0");
+        		p.x = 0;
+        		p.y = 0;
+        	}
+        	p.x = (float) loc_x;
+        	p.y = (float) loc_y;
+        	new Thread(new SchedulerRunnable(agentId, task, p, mHandler)).start();
+        } else if (unknownMsg.getClass() == TaskAssign.class) {
+        	TaskAssign ta = (TaskAssign)unknownMsg;
+        	if (ta.agentId == this.agentId) {
+        		// Task assigned to us!! Put it on the to do list
+        		ta.task = assignTask;
+        		new Thread () {
+        			public void run() {
+        				PointF p = new PointF();
+                    	if (loc_x == -1) {
+                    		Log.d("Tom", "Got no location, using loc 0, 0");
+                    		p.x = 0;
+                    		p.y = 0;
+                    	}
+                    	p.x = (float) loc_x;
+                    	p.y = (float) loc_y;
+                		Scheduler scheduler = new Scheduler(p);
+                    	Schedule sched = scheduler.CalculateScheduleFromTaems(assignTask);
+                		jobQueue.add(sched);
+        			}
+        		}.start();		
         	}
         } else {
+        	// This must be a location message - not in a class since this is send
+        	// from a c++ app.
 			Log.d("Tom", "Got message: " + mesg.toString());
 			String msg[] = mesg.toString().split("\\s+");
 			if (msg[0].contentEquals("GPS")) {
@@ -193,7 +259,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 	public void onSuccess(IMqttToken arg0) {
 		Log.d("Tom", "Success!");
 		try {
-			client.subscribe("gps/" + id, 0); // This gets called ~5 times a second
+			client.subscribe("gps/" + agentId, 0); // This gets called ~5 times a second
 			client.subscribe("tasklist", 2);
 		} catch (MqttSecurityException e) {
 			e.printStackTrace();
@@ -254,6 +320,24 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		    return capPI(d);
 		}
 
+		private double distBetweenPoints(double x1, double y1, double x2, double y2) {
+			double x_diff = x1 - x2;
+			double y_diff = y1 - y2;
+			return Math.sqrt(Math.pow(x_diff, 2) + Math.pow(y_diff, 2));
+		}
+		
+		private Method getNextTarget() {
+        	ScheduleElement s;
+        	if (curSched == null ) s = null;
+        	else s = curSched.poll();
+        	if (s == null) {
+    			if (jobQueue.isEmpty()) return null;
+    			curSched = jobQueue.poll();
+        		s = curSched.poll();
+        	}
+        	return s.getMethod();
+		}
+		
 		/**
 		 * Called repetitively while the IOIO is connected.
 		 *
@@ -271,31 +355,51 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 			float driveVel = 0.0f;
             float driveAng = 0;
             // Do nothing if we have no waypoint
+            if (curSched == null) {
+            	Method m = getNextTarget();
+            	if (m == null) {
+            		target_x = -1;
+                	target_y = -1;
+            	} else {
+            		target_x = m.x;
+            		target_y = m.y;
+            	}	
+            }
 			if (loc_x != -1 && loc_y != -1 && target_x != -1 && target_y != -1) {
 				// Calculate the current bearing to take and distance to target
-				double x_diff = loc_x - target_x;
-				double y_diff = loc_y - target_y;
-				double dist = Math.sqrt(Math.pow(x_diff, 2) + Math.pow(y_diff, 2));
-				double targetBearing = Math.atan2(y_diff, x_diff);
-				double curBearing = capPI(mBearing - bearingOffset);
+				double dist = distBetweenPoints(loc_x, loc_y, target_x, target_y);
 				
 				if (dist > 20) driveVel = 0.4f;
-				float vltc = 0.1f;
-				float antc = 1.0f;
-				driveLP = driveLP * (1-vltc)+ driveVel * vltc;
-				double bdiff = bearingDiff(curBearing, targetBearing);
-				driveAng = (float) (bdiff * 3);
-				if (driveAng > 2) driveAng = 1.0f;
-				if (driveAng < -2) driveAng = -1.0f;
-				angLP = angLP * (1-antc) + driveAng * antc;
-				driveVel = driveLP;
-				driveAng = angLP;
-				// Stopping the debug log from spamming the screen
-				p++;
-				if (p %10 == 0) {
-					Log.d("Tom", "Dist: " + dist + " TBearing: " + targetBearing + " RBearing: " + curBearing + " bd: " + bdiff);
-					Log.d("Tom", "D: " + driveVel + " A: " + driveAng);
-				}
+				else {
+					// We've reached the waypoint!
+					Method next = getNextTarget();
+					if (next == null) {
+						target_x = -1;
+						target_y = -1;
+					} else {
+						target_x = next.x;
+						target_y = next.y;
+						double targetBearing = Math.atan2(loc_y - target_y, loc_x - target_x);
+						double curBearing = capPI(mBearing - bearingOffset);
+						
+						float vltc = 0.1f;
+						float antc = 1.0f;
+						driveLP = driveLP * (1-vltc)+ driveVel * vltc;
+						double bdiff = bearingDiff(curBearing, targetBearing);
+						driveAng = (float) (bdiff * 3);
+						if (driveAng > 2) driveAng = 1.0f;
+						if (driveAng < -2) driveAng = -1.0f;
+						angLP = angLP * (1-antc) + driveAng * antc;
+						driveVel = driveLP;
+						driveAng = angLP;
+						// Stopping the debug log from spamming the screen
+						p++;
+						if (p %10 == 0) {
+							Log.d("Tom", "Dist: " + dist + " TBearing: " + targetBearing + " RBearing: " + curBearing + " bd: " + bdiff);
+							Log.d("Tom", "D: " + driveVel + " A: " + driveAng);
+						}
+					}
+				}	
 			}
             try {
             	// Calculate wheel speeds and send commands via IOIO

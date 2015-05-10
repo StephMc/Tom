@@ -37,7 +37,6 @@ import ioio.lib.api.exception.IncompatibilityException;
 import ioio.lib.api.exception.OutOfResourceException;
 
 import java.io.Closeable;
-import java.io.IOException;
 
 /**
  * This interface provides control over all the IOIO board functions.
