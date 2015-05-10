@@ -9,8 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import android.graphics.PointF;
-import android.util.Log;
+//import android.util.Log;
 import messages.Method;
 
 public class DijkstraAlgorithm {
@@ -26,10 +25,10 @@ public class DijkstraAlgorithm {
   private Set<Method> unSettledNodes;
   private Map<Method, Method> predecessors;
   private Map<Method, DijkstraDistance> distance;
-  private PointF agentPos;
+  private Point agentPos;
   //private final OptimizationMode optimizationMode = OptimizationMode.QUALITY;
 
-  public DijkstraAlgorithm(Graph graph, PointF agentPos) {
+  public DijkstraAlgorithm(Graph graph, Point agentPos) {
     // create a copy of the array so that we can operate on this array
     //this.nodes = new ArrayList<Method>(graph.getMethods());
     this.edges = new ArrayList<MethodTransition>(graph.getTransitions());
@@ -43,11 +42,10 @@ public class DijkstraAlgorithm {
     predecessors = new HashMap<Method, Method>();
     distance.put(source, new DijkstraDistance(0,0, source.x, source.y));
     unSettledNodes.add(source);
-    Log.d("Tom", "Init dijkstra done");
     while (unSettledNodes.size() > 0) {
-    	Log.d("Tom", "Iunsettled " + unSettledNodes.size());
+    	//Log.d("Tom", "Iunsettled " + unSettledNodes.size());
     	Method node = getMaximumUtility(unSettledNodes);
-    	Log.d("Tom", "Max node " + node.label);
+    	//Log.d("Tom", "Max node " + node.label);
         settledNodes.add(node);
         unSettledNodes.remove(node);
         findMaximumUtilities(node);
@@ -58,17 +56,12 @@ public class DijkstraAlgorithm {
 	long accumulatedDuration = 0;
     List<Method> adjacentNodes = getNeighbors(node);
     for (Method target : adjacentNodes) {
-    	Log.d("Tom", "Looking at node " + target.label);
       DijkstraDistance highestUtilityToNode = getHighestUtility(node);
-      Log.d("Tom", "Boop1");
       DijkstraDistance singleStepDistanceFromNodeToTarget = getDistance(node, target, highestUtilityToNode);
-      Log.d("Tom", "Boop2");
       DijkstraDistance currentHighestUtilityFromNodeToTarget = getHighestUtility(target);
-      Log.d("Tom", "Boop3");
       DijkstraDistance newUtilityFromNodeToTargetFromCurrentRoute = singleStepDistanceFromNodeToTarget;//shortestDistanceToNode.Add(singleStepDistanceFromNodeToTarget);
-      Log.d("Tom", "Boop4");
       if (newUtilityFromNodeToTargetFromCurrentRoute.HasGreaterUtility(currentHighestUtilityFromNodeToTarget)) {
-    	Log.d("Tom", "[DijkstraAlgorithm 55] Adding route " + node.toString() + " to " + target.toString() + " new:" + newUtilityFromNodeToTargetFromCurrentRoute.quality + " old:" + currentHighestUtilityFromNodeToTarget.quality);
+    	//Log.d("Tom", "[DijkstraAlgorithm 55] Adding route " + node.toString() + " to " + target.toString() + " new:" + newUtilityFromNodeToTargetFromCurrentRoute.quality + " old:" + currentHighestUtilityFromNodeToTarget.quality);
         distance.put(target, newUtilityFromNodeToTargetFromCurrentRoute);
         predecessors.put(target, node);
         unSettledNodes.add(target);
@@ -77,7 +70,6 @@ public class DijkstraAlgorithm {
   }
 
   private DijkstraDistance getDistance(Method node, Method target, DijkstraDistance distanceTillPreviousNode) {
-    Log.d("Tom", "edges len " + edges.size());
 	  for (MethodTransition edge : edges) {
       if (edge.getSource().equals(node)
           && edge.getDestination().equals(target)) {
@@ -147,10 +139,10 @@ public class DijkstraAlgorithm {
       return null;
     }
     path.add(step);
-    Log.d("Tom", "[DijkstraAlgorithm 123] Added to Path " + step.label);
+    //Log.d("Tom", "[DijkstraAlgorithm 123] Added to Path " + step.label);
     while (predecessors.get(step) != null) {
       step = predecessors.get(step);
-      Log.d("Tom", "[DijkstraAlgorithm 126] Added to Path " + step.label);
+      //Log.d("Tom", "[DijkstraAlgorithm 126] Added to Path " + step.label);
       path.add(step);
     }
     // Put it into the correct order

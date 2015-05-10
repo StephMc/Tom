@@ -1,6 +1,5 @@
 package scheduler;
 
-import android.graphics.PointF;
 import messages.Method;
 
 public class MethodTransition  {
@@ -24,7 +23,7 @@ public class MethodTransition  {
 	  public Method getSource() {
 	    return source;
 	  }
-	  public DijkstraDistance getPathUtility( DijkstraDistance distanceTillPreviousNode, PointF agentPos) {
+	  public DijkstraDistance getPathUtility( DijkstraDistance distanceTillPreviousNode, Point agentPos) {
 	    return destination.getPathUtilityRepresentedAsDistance(distanceTillPreviousNode, agentPos);
 	  }
 	  

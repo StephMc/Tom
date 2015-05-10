@@ -1,11 +1,7 @@
 package scheduler;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.List;
 
-import android.util.Log;
 import messages.Method;
 
 public class Graph {
@@ -34,18 +30,16 @@ public class Graph {
 	  o += "node [shape = doublecircle]; " + Method.FinalPoint + "_2;" + "\n";
 	  o += "node [shape = point ]; "+Method.StartingPoint + "_1" + "\n";
 	  o += "node [shape = circle];" + "\n";
-	  Log.d("Tom", "Methods size " + methods.size());
 	  for (Method m : methods) {
 		  o += m.label + "\n";
 	  }
-	  Log.d("Tom", "Trans size " + transitions.size());
 	  for (MethodTransition t : transitions) {
 		  Method s = t.getSource();
 		  Method d = t.getDestination();
 		  o += s.label + "->" + d.label + ";" + "\n";
 	  }
 	  o += "}";
-	  Log.d("Tom", o);
+	  //Log.d("Tom", o);
   }
   
 } 

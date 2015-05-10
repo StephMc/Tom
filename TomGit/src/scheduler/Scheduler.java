@@ -8,8 +8,7 @@ import messages.Task;
 
 import java.util.*;
 
-import android.graphics.PointF;
-import android.util.Log;
+//import android.util.Log;
 
 public class Scheduler {
 
@@ -17,9 +16,9 @@ public class Scheduler {
 	//Represents the start time when this schedule is being calculated, 
 	public static Date startTime = new Date();
 
-	private PointF location;
+	private Point location;
 
-	public Scheduler(PointF location)
+	public Scheduler(Point location)
 	{
 		this.location = location;
 	}
@@ -40,7 +39,7 @@ public class Scheduler {
 		//pass through a possible schedule
 		ArrayList<MethodTransition> edges = new ArrayList<MethodTransition>();
 		//Add an initial node, which will act as our starting point
-		PointF agentPos = location;
+		Point agentPos = location;
 		Method initialMethod = new Method(Method.StartingPoint, agentPos.x,agentPos.y, 0);
 		nodes.add(initialMethod);
 		Method finalMethod = new Method(Method.FinalPoint, agentPos.x,agentPos.y, 0);
@@ -55,26 +54,26 @@ public class Scheduler {
 			edges.add(t);
 		}
 
-		Log.d("Tom", "About to make graph");
+		//Log.d("Tom", "About to make graph");
 		//Create a Graph of these methods and run Dijkstra Algorithm on it
 		Graph graph = new Graph(nodes, edges);
 		//Log.d("Tom", "About to print graph");
 		//graph.Print();
-		Log.d("Tom", "About to run algo");
+		//Log.d("Tom", "About to run algo");
 		DijkstraAlgorithm dijkstra = new DijkstraAlgorithm(graph, agentPos);
 		dijkstra.execute(initialMethod);
 		LinkedList<Method> path = dijkstra.getPath(finalMethod);
-		Log.d("Tom", "Done path");
+		//Log.d("Tom", "Done path");
 		//Print the determined schedule
 		int totalquality = 0;
 		if (path!=null)
-			Log.d("Tom", "Starting path print");
+			//Log.d("Tom", "Starting path print");
 			for (Method vertex : path) {
 				if (!vertex.label.equals("Final Point"))//Ignore final point as its only necessary to complete graph for dijkstra, but we don't need to visit it
 				{
 					totalquality += vertex.getOutcome().getQuality();
 					schedule.addItem(new ScheduleElement(vertex));
-					Log.d("Tom", "M: " + vertex.label);
+					//Log.d("Tom", "M: " + vertex.label);
 				}
 			}
 		schedule.TotalQuality = totalquality;
@@ -110,7 +109,7 @@ public class Scheduler {
 		{
 			m += s.label + " > ";
 		}
-		Log.d("Tom", "[Scheduler 185] Node Methods: " + m );
+		//Log.d("Tom", "[Scheduler 185] Node Methods: " + m );
 	}
 
 	//A helper method used internally by CalculateScheduleFromTaems method
@@ -127,7 +126,7 @@ public class Scheduler {
 				m = new Method((Method)task);
 				//else
 					//m = (Method)task;
-				Log.d("Tom", "Made method " + m.label + " with task " + task.label);
+				//Log.d("Tom", "Made method " + m.label + " with task " + task.label);
 				nodes.add(m);
 				MethodTransition t = new MethodTransition("From " + lastMethod.label + " to " + m.label, lastMethod, m);
 				edges.add(t);
@@ -135,7 +134,7 @@ public class Scheduler {
 			} else {
 				Method[] localLastMethodList = new Method[]{lastMethod};
 				Task tk = (Task)task;
-				Log.d("Tom", "[Scheduler 212] Node is Task. Enumerating children for " + tk.label);
+				//Log.d("Tom", "[Scheduler 212] Node is Task. Enumerating children for " + tk.label);
 				//Designate a parent for this task, which can be used for completion notifications up the hierarchy
 				//All tasks must be executed, though not necessarily in sequence
 				//Create task list whose permutations need to be found

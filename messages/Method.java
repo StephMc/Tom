@@ -5,8 +5,8 @@ import java.io.Serializable;
 import scheduler.DijkstraDistance;
 import scheduler.Node;
 import scheduler.Outcome;
-import android.graphics.PointF;
-import android.util.Log;
+import scheduler.Point;
+//import android.util.Log;
 
 public class Method extends Node implements Serializable {
 	/**
@@ -21,7 +21,7 @@ public class Method extends Node implements Serializable {
 	public static String FinalPoint = "Finish";
 	public static String StartingPoint = "Start";
 	private int deadline = 0;
-	private Outcome outcome;// 
+	private Outcome outcome;
 	private double heuristicQuality = 40000;
 
 	public Method(String methodId, double wayPointX, double wayPointY, long activationTime) {
@@ -30,7 +30,6 @@ public class Method extends Node implements Serializable {
 		this.y = wayPointY;
 		this.activationTime = activationTime;
 		this.outcome = new Outcome(500, 10, 0);
-		Log.d("Tom", "Meth meth has " + this.label);
 	}
 
 	public Method(Method method) {
@@ -44,7 +43,7 @@ public class Method extends Node implements Serializable {
 	}
 	
 	public DijkstraDistance getPathUtilityRepresentedAsDistance(
-			DijkstraDistance distanceTillPreviousNode, PointF agentPos) {
+			DijkstraDistance distanceTillPreviousNode, Point agentPos) {
 		//This is distance calculation for this step only. Previous distance used for calculation, but not appended
 		DijkstraDistance d = new DijkstraDistance(0,0,this.x, this.y);
 		if (this.label==Method.FinalPoint)
@@ -56,20 +55,20 @@ public class Method extends Node implements Serializable {
 		double totalDurationTillNow = distanceTillPreviousNode.duration + this.outcome.getDuration();
 		if ((totalDurationTillNow) > deadline && deadline != 0) {
 			d.quality = Long.MIN_VALUE;
-			Log.d("Tom", "[Method 54] Using infinitely negative utility because of " + deadline + " deadline breakage by duration " + totalDurationTillNow);
+			//Log.d("Tom", "[Method 54] Using infinitely negative utility because of " + deadline + " deadline breakage by duration " + totalDurationTillNow);
 		} else {
-			Log.d("Tom", "[Method 54] Deadline " + deadline + " will be met by " + totalDurationTillNow);
+			//Log.d("Tom", "[Method 54] Deadline " + deadline + " will be met by " + totalDurationTillNow);
 			double distance = Math.round(distBetweenPoints(agentPos.x, agentPos.y, this.x, this.y));
 			d.quality = this.outcome.getQuality() - distance;
-			Log.d("Tom", "task distance = " + distance + " total quality = " + d.quality);
+			//Log.d("Tom", "task distance = " + distance + " total quality = " + d.quality);
 			if (d.quality>heuristicQuality) {
 				//Revisit heuristic logic
 				d.quality = Long.MIN_VALUE;
 			}
 			d.duration = this.outcome.getDuration();
-			Log.d("Tom", "[Method 57] Distance from (" + distanceTillPreviousNode.vector.x + ","+distanceTillPreviousNode.vector.y+ ") to " + this.label + " ("+this.x+","+this.y+") ");
+			//Log.d("Tom", "[Method 57] Distance from (" + distanceTillPreviousNode.vector.x + ","+distanceTillPreviousNode.vector.y+ ") to " + this.label + " ("+this.x+","+this.y+") ");
 		}
-		Log.d("Tom", "[Method 66] Quality determined for " + this.label + " is " + d.quality );
+		//Log.d("Tom", "[Method 66] Quality determined for " + this.label + " is " + d.quality );
 		return d;
 	}
 

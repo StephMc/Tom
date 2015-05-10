@@ -2,6 +2,7 @@ package com.example.tom;
 
 import java.util.Iterator;
 
+import scheduler.Point;
 import scheduler.Schedule;
 import scheduler.ScheduleElement;
 import scheduler.Scheduler;
@@ -14,11 +15,11 @@ import messages.Utility;
 
 public class SchedulerRunnable implements Runnable {
 	private Task task;
-	private PointF location;
+	private Point location;
 	private String agentId;
 	private Handler mainTask;
 	
-	SchedulerRunnable(String agentId, Task task, PointF location, Handler mainTask) {
+	SchedulerRunnable(String agentId, Task task, Point location, Handler mainTask) {
 		this.task = task;
 		this.location= location;
 		this.agentId = agentId;

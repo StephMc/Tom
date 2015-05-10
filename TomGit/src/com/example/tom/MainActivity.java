@@ -26,6 +26,7 @@ import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.MqttSecurityException;
 
 import scheduler.Node;
+import scheduler.Point;
 import scheduler.Schedule;
 import scheduler.ScheduleElement;
 import scheduler.Scheduler;
@@ -200,14 +201,13 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         if (unknownMsg.getClass() == Task.class) {
         	Task task = (Task) unknownMsg;
         	Log.d("Tom", "Got task " + task.label + " with " + task.children.size());
-        	PointF p = new PointF();
+        	Point p;
         	if (loc_x == -1) {
         		Log.d("Tom", "Got no location, using loc 0, 0");
-        		p.x = 0;
-        		p.y = 0;
+        		p = new Point(-1, -1);
+        	} else {
+        		p = new Point(loc_x, loc_y);
         	}
-        	p.x = (float) loc_x;
-        	p.y = (float) loc_y;
         	new Thread(new SchedulerRunnable(agentId, task, p, mHandler)).start();
         } else if (unknownMsg.getClass() == TaskAssign.class) {
         	TaskAssign ta = (TaskAssign)unknownMsg;
@@ -216,14 +216,13 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         		ta.task = assignTask;
         		new Thread () {
         			public void run() {
-        				PointF p = new PointF();
+        				Point p;
                     	if (loc_x == -1) {
                     		Log.d("Tom", "Got no location, using loc 0, 0");
-                    		p.x = 0;
-                    		p.y = 0;
+                    		p = new Point(-1, -1);
+                    	} else {
+                    		p = new Point(loc_x, loc_y);
                     	}
-                    	p.x = (float) loc_x;
-                    	p.y = (float) loc_y;
                 		Scheduler scheduler = new Scheduler(p);
                     	Schedule sched = scheduler.CalculateScheduleFromTaems(assignTask);
                 		jobQueue.add(sched);

@@ -1,19 +1,16 @@
 package scheduler;
 
-import android.graphics.PointF;
 
 public class DijkstraDistance {
 	public double quality = 0;
 	public double duration = 0;
-	public PointF vector;
+	public Point vector;
 	
 	public DijkstraDistance(double qual, double dur, double x, double y)
 	{
 		quality = qual;
 		duration = dur;
-		vector = new PointF();
-		vector.x = (float) x;
-		vector.y = (float) y;
+		vector = new Point(x, y);
 	}
 	
 	public DijkstraDistance Add(DijkstraDistance d2)

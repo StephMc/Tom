@@ -1,7 +1,6 @@
 package messages;
 
 import java.io.Serializable;
-
 import scheduler.Node;
 
 public class Task extends Node implements Serializable {
