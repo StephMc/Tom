@@ -8,10 +8,12 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Iterator;
 
 public class Schedule {
+	public String topLevelTaskLabel;
 	private Queue<ScheduleElement> items;
 	public int TotalQuality = 0;
-	public Schedule() {
+	public Schedule(String topLevelTaskLabel) {
 		items = new ConcurrentLinkedQueue<ScheduleElement>();
+		this.topLevelTaskLabel = topLevelTaskLabel;
 	}
 	public void addItem(ScheduleElement item){
 		//Main.Message("[Schedule] Added to schedule task " + item.getName());

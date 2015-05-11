@@ -1,6 +1,12 @@
 package messages;
 
-public class TaskAssign {
+import java.io.Serializable;
+
+public class TaskAssign implements Serializable {
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -849849438027388652L;
 	public Task task;
 	public String agentId;
 	

@@ -38,6 +38,7 @@ public class SchedulerRunnable implements Runnable {
     	Utility u = new Utility(task.label, agentId, sched.TotalQuality);
     	Message m = Message.obtain(mainTask);
     	m.obj = (Object) u;
+    	m.arg1 = 0;
     	m.sendToTarget();
     	
     	Log.d("Tom", "Got cost " + sched.TotalQuality);

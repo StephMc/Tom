@@ -29,7 +29,7 @@ public class Scheduler {
 	public Schedule CalculateScheduleFromTaems(Task topLevelTask)
 	{
 		//Reinitialize the schedule item
-		Schedule schedule = new Schedule();
+		Schedule schedule = new Schedule(topLevelTask.label);
 		//Reinitialize the start time of calculation
 		startTime = new Date();
 

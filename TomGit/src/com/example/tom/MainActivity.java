@@ -5,11 +5,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import messages.Complete;
 import messages.Method;
 import messages.Task;
 import messages.TaskAssign;
@@ -67,6 +69,10 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
     private String agentId = "1";
     private Queue<Schedule> jobQueue = new ConcurrentLinkedQueue<Schedule>();
     private Schedule curSched = null;
+    
+    private String MASTER_AGENT = "1";
+    private int totalNodes = 1;
+    private HashMap<String, InProgressTask> inProgressTasks = new HashMap<String, InProgressTask>();
     
     // Used to pass the task between ui thread and thread to calculate the cost of task
     // This is needed since the task cost calculation is very slow and stop the robot getting
@@ -132,8 +138,13 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 			@Override
             public void handleMessage(Message inputMessage) {
 				Log.d("Tom", "Handled!");
-				Utility u = (Utility) inputMessage.obj;
-				publishObject("utility", u);
+				if (inputMessage.arg1 == 0) {
+					Utility u = (Utility) inputMessage.obj;
+					publishObject("utility", u);
+				} else if (inputMessage.arg1 == 1) {
+					Complete c = (Complete) inputMessage.obj;
+					publishObject("complete", c);
+				}
 			}
 		};
 	}
@@ -152,7 +163,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		byte bytes[]=b.toByteArray();
         try {
 			client.publish(topic, bytes, 2, false);
-			Log.d("Tom", "Published!");
+			Log.d("Tom", "Published to " + topic);
 		} catch (MqttPersistenceException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -189,8 +200,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 
 	@Override
 	public void deliveryComplete(IMqttDeliveryToken arg0) {
-		// TODO Auto-generated method stub
-		
+		// TODO Auto-generated method stub	
 	}
 	
 	@Override
@@ -200,6 +210,8 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         Object unknownMsg = o1.readObject();
         if (unknownMsg.getClass() == Task.class) {
         	Task task = (Task) unknownMsg;
+        	InProgressTask ip = new InProgressTask(task);
+        	inProgressTasks.put(task.label, ip);
         	Log.d("Tom", "Got task " + task.label + " with " + task.children.size());
         	Point p;
         	if (loc_x == -1) {
@@ -211,6 +223,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         	new Thread(new SchedulerRunnable(agentId, task, p, mHandler)).start();
         } else if (unknownMsg.getClass() == TaskAssign.class) {
         	TaskAssign ta = (TaskAssign)unknownMsg;
+        	Log.d("Tom", "Task " + ta.task.label + " assigned to " + ta.agentId);
         	if (ta.agentId == this.agentId) {
         		// Task assigned to us!! Put it on the to do list
         		ta.task = assignTask;
@@ -225,9 +238,34 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
                     	}
                 		Scheduler scheduler = new Scheduler(p);
                     	Schedule sched = scheduler.CalculateScheduleFromTaems(assignTask);
+                    	Log.d("Tom", "Assigning task " + assignTask.label + " with cost " + sched.TotalQuality);
                 		jobQueue.add(sched);
         			}
         		}.start();		
+        	}
+        } else if (unknownMsg.getClass() == Utility.class) {
+        	// We are the master agent
+        	Utility u = (Utility) unknownMsg;
+        	if (inProgressTasks.containsKey(u.taskId)) {
+        		Log.d("Tom", "Got utility " + u.cost);
+        		InProgressTask ip = inProgressTasks.get(u.taskId);
+        		ip.totalResponses++;
+        		if (u.cost < ip.bestCost || ip.bestCost == -1) {
+        			// We've found the new best cost
+        			ip.bestAgent = u.agentId;
+        			ip.bestCost = u.cost;
+        		}
+        		if (ip.totalResponses == totalNodes) {
+        			// We've got a response from everyone, assign task
+        			TaskAssign ta = new TaskAssign(ip.task, ip.bestAgent);
+        			publishObject("assign", (Object) ta);
+        			inProgressTasks.remove(ip.task);
+        		} else {
+        			// Update the in progress task
+        			inProgressTasks.put(ip.task.label, ip);
+        		}
+        	} else {
+        		Log.d("Tom", "Haven't seen this task before...");
         	}
         } else {
         	// This must be a location message - not in a class since this is send
@@ -260,6 +298,10 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		try {
 			client.subscribe("gps/" + agentId, 0); // This gets called ~5 times a second
 			client.subscribe("tasklist", 2);
+			client.subscribe("assign", 2);
+			if (agentId.contentEquals(MASTER_AGENT)) {
+				client.subscribe("utility", 2);
+			}
 		} catch (MqttSecurityException e) {
 			e.printStackTrace();
 		} catch (MqttException e) {
@@ -330,7 +372,16 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         	if (curSched == null ) s = null;
         	else s = curSched.poll();
         	if (s == null) {
+        		if (curSched != null) {
+        			// We've finished this task. Need to send complete message
+        			Message m = Message.obtain(mHandler);
+        			Complete c = new Complete(curSched.topLevelTaskLabel, System.nanoTime());
+        	    	m.obj = (Object) c;
+        	    	m.arg1 = 1;
+        	    	m.sendToTarget();
+        		}
     			if (jobQueue.isEmpty()) return null;
+    			
     			curSched = jobQueue.poll();
         		s = curSched.poll();
         	}
