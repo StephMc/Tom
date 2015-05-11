@@ -70,8 +70,8 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
     private Queue<Schedule> jobQueue = new ConcurrentLinkedQueue<Schedule>();
     private Schedule curSched = null;
     
-    private String MASTER_AGENT = "1";
-    private int totalNodes = 1;
+    private String MASTER_AGENT = "0";
+    private int totalNodes = 2;
     private HashMap<String, InProgressTask> inProgressTasks = new HashMap<String, InProgressTask>();
     
     // Used to pass the task between ui thread and thread to calculate the cost of task
@@ -91,7 +91,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
             public void onClick(View v) {
             	Log.d("Tom", "Button!");
                 bearingOffset = mBearing;
-                if (!client.isConnected()) return;
+                /*if (!client.isConnected()) return;
                 Method m1 = new Method("meep", 110, 110, System.nanoTime());
                 Method m2 = new Method("OOH", 10, 10, System.nanoTime());
                 Method m3 = new Method("beep", 120, 120, System.nanoTime());
@@ -106,7 +106,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
                 //task.addNode(m5);
                 //task.addNode(m6);
                 publishObject("tasklist", task);
-                Log.d("Tom", "Sent task " + task.label + " with " + task.children.size());
+                Log.d("Tom", "Sent task " + task.label + " with " + task.children.size());*/
             }
         });
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -204,79 +204,85 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 	}
 	
 	@Override
-	public void messageArrived(String arg0, MqttMessage mesg) throws Exception {	
-		ByteArrayInputStream b1 = new ByteArrayInputStream(mesg.getPayload());
-        ObjectInputStream o1 = new ObjectInputStream(b1);
-        Object unknownMsg = o1.readObject();
-        if (unknownMsg.getClass() == Task.class) {
-        	Task task = (Task) unknownMsg;
-        	InProgressTask ip = new InProgressTask(task);
-        	inProgressTasks.put(task.label, ip);
-        	Log.d("Tom", "Got task " + task.label + " with " + task.children.size());
-        	Point p;
-        	if (loc_x == -1) {
-        		Log.d("Tom", "Got no location, using loc 0, 0");
-        		p = new Point(-1, -1);
-        	} else {
-        		p = new Point(loc_x, loc_y);
-        	}
-        	new Thread(new SchedulerRunnable(agentId, task, p, mHandler)).start();
-        } else if (unknownMsg.getClass() == TaskAssign.class) {
-        	TaskAssign ta = (TaskAssign)unknownMsg;
-        	Log.d("Tom", "Task " + ta.task.label + " assigned to " + ta.agentId);
-        	if (ta.agentId == this.agentId) {
-        		// Task assigned to us!! Put it on the to do list
-        		ta.task = assignTask;
-        		new Thread () {
-        			public void run() {
-        				Point p;
-                    	if (loc_x == -1) {
-                    		Log.d("Tom", "Got no location, using loc 0, 0");
-                    		p = new Point(-1, -1);
-                    	} else {
-                    		p = new Point(loc_x, loc_y);
-                    	}
-                		Scheduler scheduler = new Scheduler(p);
-                    	Schedule sched = scheduler.CalculateScheduleFromTaems(assignTask);
-                    	Log.d("Tom", "Assigning task " + assignTask.label + " with cost " + sched.TotalQuality);
-                		jobQueue.add(sched);
-        			}
-        		}.start();		
-        	}
-        } else if (unknownMsg.getClass() == Utility.class) {
-        	// We are the master agent
-        	Utility u = (Utility) unknownMsg;
-        	if (inProgressTasks.containsKey(u.taskId)) {
-        		Log.d("Tom", "Got utility " + u.cost);
-        		InProgressTask ip = inProgressTasks.get(u.taskId);
-        		ip.totalResponses++;
-        		if (u.cost < ip.bestCost || ip.bestCost == -1) {
-        			// We've found the new best cost
-        			ip.bestAgent = u.agentId;
-        			ip.bestCost = u.cost;
-        		}
-        		if (ip.totalResponses == totalNodes) {
-        			// We've got a response from everyone, assign task
-        			TaskAssign ta = new TaskAssign(ip.task, ip.bestAgent);
-        			publishObject("assign", (Object) ta);
-        			inProgressTasks.remove(ip.task);
-        		} else {
-        			// Update the in progress task
-        			inProgressTasks.put(ip.task.label, ip);
-        		}
-        	} else {
-        		Log.d("Tom", "Haven't seen this task before...");
-        	}
-        } else {
+	public void messageArrived(String arg0, MqttMessage mesg) {	
+		try {
+			ByteArrayInputStream b1 = new ByteArrayInputStream(mesg.getPayload());
+			ObjectInputStream o1 = new ObjectInputStream(b1);
+        	Object unknownMsg = o1.readObject();
+        	Log.d("Tom", "Got object!");
+	        if (unknownMsg.getClass() == Task.class) {
+	        	Task task = (Task) unknownMsg;
+	        	InProgressTask ip = new InProgressTask(task);
+	        	inProgressTasks.put(task.label, ip);
+	        	Log.d("Tom", "Got task " + task.label + " with " + task.children.size());
+	        	Point p;
+	        	if (loc_x == -1) {
+	        		Log.d("Tom", "Got no location, using loc 0, 0");
+	        		p = new Point(-1, -1);
+	        	} else {
+	        		p = new Point(loc_x, loc_y);
+	        	}
+	        	new Thread(new SchedulerRunnable(agentId, task, p, mHandler)).start();
+	        } else if (unknownMsg.getClass() == TaskAssign.class) {
+	        	TaskAssign ta = (TaskAssign)unknownMsg;
+	        	Log.d("Tom", "Task " + ta.task.label + " assigned to " + ta.agentId);
+	        	if (ta.agentId.contentEquals(this.agentId)) {
+	        		// Task assigned to us!! Put it on the to do list
+	        		Log.d("Tom", "We got a task");
+	        		assignTask = ta.task;
+	        		new Thread () {
+	        			public void run() {
+	        				Point p;
+	                    	if (loc_x == -1) {
+	                    		Log.d("Tom", "Got no location, using loc 0, 0");
+	                    		p = new Point(-1, -1);
+	                    	} else {
+	                    		p = new Point(loc_x, loc_y);
+	                    	}
+	                		Scheduler scheduler = new Scheduler(p);
+	                    	Schedule sched = scheduler.CalculateScheduleFromTaems(assignTask);
+	                    	Log.d("Tom", "Assigning task " + assignTask.label + " with cost " + sched.TotalQuality);
+	                		jobQueue.add(sched);
+	        			}
+	        		}.start();		
+	        	}
+	        } else if (unknownMsg.getClass() == Utility.class) {
+	        	// We are the master agent
+	        	Utility u = (Utility) unknownMsg;
+	        	if (inProgressTasks.containsKey(u.taskId)) {
+	        		Log.d("Tom", "Got utility " + u.cost + " from " + u.agentId);
+	        		InProgressTask ip = inProgressTasks.get(u.taskId);
+	        		ip.totalResponses++;
+	        		if (u.cost < ip.bestCost || ip.bestCost == -1) {
+	        			// We've found the new best cost
+	        			ip.bestAgent = u.agentId;
+	        			ip.bestCost = u.cost;
+	        		}
+	        		if (ip.totalResponses == totalNodes) {
+	        			// We've got a response from everyone, assign task
+	        			TaskAssign ta = new TaskAssign(ip.task, ip.bestAgent);
+	        			publishObject("assign", (Object) ta);
+	        			inProgressTasks.remove(ip.task);
+	        		} else {
+	        			// Update the in progress task
+	        			inProgressTasks.put(ip.task.label, ip);
+	        		}
+	        	} else {
+	        		Log.d("Tom", "Haven't seen this task before...");
+	        	}
+	        } else {
+	        	Log.d("Tom", "Unknown mqtt message class");
+	        }
+        } catch (Exception e) {
         	// This must be a location message - not in a class since this is send
         	// from a c++ app.
-			Log.d("Tom", "Got message: " + mesg.toString());
+			Log.d("CPS", "Got message: " + mesg.toString());
 			String msg[] = mesg.toString().split("\\s+");
 			if (msg[0].contentEquals("GPS")) {
 				loc_x = Double.parseDouble(msg[1]);
 				loc_y = Double.parseDouble(msg[2]);
 			}  else {
-				Log.d("Tom", "Unknown mqtt message");
+				Log.d("Tom", "Unknown mqtt message string");
 			}
         }
 	}
@@ -317,6 +323,48 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         private PID pid2_;
         private PID pid3_;
         private PID pid4_;
+        
+        float leftLP = 0;
+		float rightLP = 0;
+
+		float pDis = 0f;
+		float iDis = 0f;
+		float dDis = 0f;
+
+		float pAng = 0f;
+		float iAng = 0f;
+		float dAng = 0f;
+
+		float pD = 0.01f;
+		float iD = 0.000000001f;
+		float dD = 0.001f;
+
+		float AD = pD + iD + dD;
+		float BD = -(pD + 2*dD);
+		float CD = dD;
+
+		float pA = 0.4f;
+		float iA = 0.0003f;
+		float dA = 0.2f;
+
+		float AA = pA + iA + dA;
+		float BA = -(pA + 2*dA);
+		float CA = dA;
+
+		float mD[] = {0f,0f,0f};
+		float cD = 0f;
+		float mA[] = {0f,0f,0f};
+		float cA = 0f;
+
+		float itc = 1.0f;
+		float tc = 0.1f;
+		
+		float a = 1.0f;
+		float b = 0.3f;
+		float lim = 0.5f;
+		
+		float angLP = 0.0f;
+		float disLP = 0f;
 
 		/**
 		 * Called every time a connection with IOIO has been established.
@@ -379,11 +427,15 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         	    	m.obj = (Object) c;
         	    	m.arg1 = 1;
         	    	m.sendToTarget();
+        	    	curSched = null;
         		}
     			if (jobQueue.isEmpty()) return null;
     			
     			curSched = jobQueue.poll();
         		s = curSched.poll();
+        	}
+        	if (s.getMethod() != null) {
+        		Log.d("Tom", "Got target " + s.getMethod().x + " " + s.getMethod().y);
         	}
         	return s.getMethod();
 		}
@@ -398,8 +450,6 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		 *
 		 * @see ioio.lib.util.IOIOLooper#loop()
 		 */
-		float driveLP = 0;
-		float angLP = 0;
 		@Override
 		public void loop() throws ConnectionLostException, InterruptedException {
 			float driveVel = 0.0f;
@@ -408,57 +458,107 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
             if (curSched == null) {
             	Method m = getNextTarget();
             	if (m == null) {
-            		target_x = -1;
-                	target_y = -1;
+            		target_x = loc_x;
+                	target_y = loc_y;
+                	Log.d("ctrl", "No target");
             	} else {
             		target_x = m.x;
             		target_y = m.y;
             	}	
             }
-			if (loc_x != -1 && loc_y != -1 && target_x != -1 && target_y != -1) {
+            
+            if (loc_x != -1) {
+		        Log.d("ctrl", "Target is " + target_x + " " + target_y + " " + loc_x + " " + loc_y);
 				// Calculate the current bearing to take and distance to target
-				double dist = distBetweenPoints(loc_x, loc_y, target_x, target_y);
+				double dist = distBetweenPoints(loc_x, loc_y, target_x, target_y);			
+				double targetBearing = Math.atan2(loc_y - target_y, loc_x - target_x);
+				double curBearing = capPI(mBearing - bearingOffset);
+				double errBearing = -capPI(targetBearing - curBearing);
+		
+				//Magic control stuff
+				if(Math.abs(errBearing) > Math.PI/2)dist = - dist;
 				
-				if (dist > 20) driveVel = 0.4f;
-				else {
+				angLP = angLP * (1-itc) + (float)errBearing*itc;
+				disLP = disLP * (1-itc) + (float)dist*itc;
+				
+				disLP = (float) (disLP * (Math.exp(-(angLP*angLP)/0.4)));
+				
+				if (Math.abs(dist) < 20){
+					disLP = 0;
+					angLP = 0;
+					for(int i=0;i<3;i++){
+						mD[i]=0;
+						mA[i]=0;
+					}
+					cD = 0;
+					cA = 0;
+					
 					// We've reached the waypoint!
 					Method next = getNextTarget();
 					if (next == null) {
-						target_x = -1;
-						target_y = -1;
+						target_x = loc_x;
+						target_y = loc_y;
 					} else {
 						target_x = next.x;
 						target_y = next.y;
-						double targetBearing = Math.atan2(loc_y - target_y, loc_x - target_x);
-						double curBearing = capPI(mBearing - bearingOffset);
-						
-						float vltc = 0.1f;
-						float antc = 1.0f;
-						driveLP = driveLP * (1-vltc)+ driveVel * vltc;
-						double bdiff = bearingDiff(curBearing, targetBearing);
-						driveAng = (float) (bdiff * 3);
-						if (driveAng > 2) driveAng = 1.0f;
-						if (driveAng < -2) driveAng = -1.0f;
-						angLP = angLP * (1-antc) + driveAng * antc;
-						driveVel = driveLP;
-						driveAng = angLP;
-						// Stopping the debug log from spamming the screen
-						p++;
-						if (p %10 == 0) {
-							Log.d("Tom", "Dist: " + dist + " TBearing: " + targetBearing + " RBearing: " + curBearing + " bd: " + bdiff);
-							Log.d("Tom", "D: " + driveVel + " A: " + driveAng);
-						}
 					}
-				}	
-			}
+				} else {	
+					if (dist > 100) dist = 100;
+					mD[0] = mD[1];
+					mD[1] = mD[2];
+					mD[2] = disLP;
+					cD = cD
+							+ mD[2] * AD
+							+ mD[1] * BD
+							+ mD[0] * CD;
+					mA[0] = mA[1];
+					mA[1] = mA[2];
+					mA[2] = angLP;
+					cA = cA
+							+ mA[2] * AA
+							+ mA[1] * BA
+							+ mA[0] * CA;
+			
+					driveVel = cD;
+					driveAng = cA;
+			
+					//end magic control stuff
+			
+			
+					// Stopping the debug log from spamming the screen
+					p++;
+					if (p %10 == 0) {
+						Log.d("ctrl", "Dist: " + disLP + " Ang: " + angLP );
+						Log.d("ctrl", "D: " + driveVel + " A: " + driveAng);
+					}
+				}
+            }
             try {
-            	// Calculate wheel speeds and send commands via IOIO
-                float left = driveVel * (float)Math.cos((double)driveAng) + driveVel * (float)Math.sin((double)driveAng);
-                float right = -driveVel * (float)Math.cos((double)driveAng) + driveVel * (float)Math.sin((double)driveAng);
-                pid1_.setSpeed(-left);
-                pid2_.setSpeed(right);
-                pid3_.setSpeed(left);
-                pid4_.setSpeed(-right);
+// Calculate wheel speeds and send commands via IOIO
+				
+				float left = driveVel*b + driveAng*a;
+				float right = -driveVel*b + driveAng*a;
+
+				
+				//cap the values while maintaining ratio
+				float scl = 1f;
+				float sclL = Math.abs(left / lim);
+				float sclR = Math.abs(right / lim);
+				scl = Math.max(scl,sclL);
+				scl = Math.max(scl, sclR);
+				left = left / scl;
+				right = right / scl;
+
+
+				leftLP = leftLP * (1-tc) + left*tc;
+				rightLP = rightLP * (1-tc) + right*tc;
+				
+				Log.d("ctrl", "Left " + leftLP + " " + rightLP);
+				
+				pid1_.setSpeed(-leftLP);
+				pid2_.setSpeed(rightLP);
+				pid3_.setSpeed(leftLP);
+				pid4_.setSpeed(-rightLP);
             } catch (IOException e) {
                 e.printStackTrace();
             }
