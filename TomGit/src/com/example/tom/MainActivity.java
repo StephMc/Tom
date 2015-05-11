@@ -211,6 +211,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         	Object unknownMsg = o1.readObject();
         	Log.d("Tom", "Got object!");
 	        if (unknownMsg.getClass() == Task.class) {
+	        	//***BeginAgentMessages
 	        	Task task = (Task) unknownMsg;
 	        	InProgressTask ip = new InProgressTask(task);
 	        	inProgressTasks.put(task.label, ip);
@@ -227,6 +228,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 	        	TaskAssign ta = (TaskAssign)unknownMsg;
 	        	Log.d("Tom", "Task " + ta.task.label + " assigned to " + ta.agentId);
 	        	if (ta.agentId.contentEquals(this.agentId)) {
+	        		//***EndAgentMessages 
 	        		// Task assigned to us!! Put it on the to do list
 	        		Log.d("Tom", "We got a task");
 	        		assignTask = ta.task;
@@ -318,6 +320,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 	
 	class Looper extends BaseIOIOLooper {
 		/** The on-board LED. */
+		//***MainControlLoopParameters
 		private DigitalOutput led_;
         private PID pid1_;
         private PID pid2_;
@@ -450,6 +453,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		 *
 		 * @see ioio.lib.util.IOIOLooper#loop()
 		 */
+		//***MainControlLoop
 		@Override
 		public void loop() throws ConnectionLostException, InterruptedException {
 			float driveVel = 0.0f;
