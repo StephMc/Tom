@@ -70,6 +70,11 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
     private Queue<Schedule> jobQueue = new ConcurrentLinkedQueue<Schedule>();
     private Schedule curSched = null;
     
+  //***WeavingFunctionParameters
+    private double weaveTotal = 0; // Keeps track of the total number of direction changes
+    private long startRunTime;
+    private double prevDriveAng = 0;
+    
     private String MASTER_AGENT = "0";
     private int totalNodes = 2;
     private HashMap<String, InProgressTask> inProgressTasks = new HashMap<String, InProgressTask>();
@@ -127,6 +132,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		loc_y = -1;
 		target_x = -1;
 		target_y = -1;
+		startRunTime = System.nanoTime();
 		
 		// Set up android sensors for rotation
 		mSensorManager = (SensorManager) this.getSystemService(Context.SENSOR_SERVICE);
@@ -289,6 +295,11 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
         }
 	}
 
+	//***WeavingFunction
+	public double getWeaveRate() {
+		return weaveTotal / (System.nanoTime() - startRunTime);
+	}
+	
 	@Override
 	public void onFailure(IMqttToken arg0, Throwable arg1) {
 		// TODO Auto-generated method stub
@@ -368,7 +379,7 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 		
 		float angLP = 0.0f;
 		float disLP = 0f;
-
+		
 		/**
 		 * Called every time a connection with IOIO has been established.
 		 * Typically used to open pins.
@@ -542,7 +553,11 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 				
 				float left = driveVel*b + driveAng*a;
 				float right = -driveVel*b + driveAng*a;
-
+				
+				if (driveAng * prevDriveAng < 0) {
+					weaveTotal++;
+				}
+				prevDriveAng = driveAng;
 				
 				//cap the values while maintaining ratio
 				float scl = 1f;
@@ -552,7 +567,6 @@ public class MainActivity extends IOIOActivity implements MqttCallback, IMqttAct
 				scl = Math.max(scl, sclR);
 				left = left / scl;
 				right = right / scl;
-
 
 				leftLP = leftLP * (1-tc) + left*tc;
 				rightLP = rightLP * (1-tc) + right*tc;
